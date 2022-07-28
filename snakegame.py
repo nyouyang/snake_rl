@@ -20,7 +20,7 @@ from collections import deque
 from random import choice
 
 
-class Coordinate:
+class Vector:
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -29,30 +29,31 @@ class Coordinate:
         return f'(x: {self.x}, y: {self.y})'
 
     def __eq__(self, compare):
-        assert isinstance(compare, Coordinate), 'Cannot compare equality of a Coordinate object with a non-Coordinate object'
+        assert isinstance(compare, Vector), 'Cannot compare equality of a Vector object with a non-Vector object'
         return self.x == compare.x and self.y == compare.y
 
     def __add__(self, other):
-        assert isinstance(other, Coordinate), 'Cannot add a Coordinate object with a non-Coordinate object'
-        return Coordinate(self.x + other.x, self.y + other.y)
+        assert isinstance(other, Vector), 'Cannot add a Vector object with a non-Vector object'
+        return Vector(self.x + other.x, self.y + other.y)
 
     def __hash__(self):
         x, y = self.x, self.y
         return int((x + y) * (x + y + 1) / 2 + y + 1) # interesting NxN hash function, courtesy of Surya Subbarao
 
 DIRECTION_MAP = {
-    'up': Coordinate(0, -1),
-    'down': Coordinate(0, 1),
-    'right': Coordinate(1, 0),
-    'left': Coordinate(-1, 0)
+    'up': Vector(0, -1),
+    'down': Vector(0, 1),
+    'right': Vector(1, 0),
+    'left': Vector(-1, 0)
 }
 
 class Snake:
     def __init__(self):
-        self.head = Coordinate(2, 0) # make it start at (2, 0)
-        self.tail = deque([Coordinate(0, 0), Coordinate(1, 0)]) # [first in, ..., last in]
+        self.head = Vector(2, 0) # make it start at (2, 0)
+        self.tail = deque([Vector(0, 0), Vector(1, 0)]) # [first in, ..., last in]
         self.snake_size = 3
-        self.direction = Coordinate(1, 0)
+        self.direction = Vector(1, 0)
+        self.snake_locations = set([self.head] + list(self.tail))
 
     def __repr__(self):
         return f'''
@@ -71,13 +72,15 @@ class Snake:
             last = self.tail.popleft()
         self.tail.append(self.head)
         self.head = new_head
+        self.snake_locations.add(new_head)
+        self.snake_locations.remove(last)
         return last
 
 class Grid:
     def __init__(self, grid_size = 10):
         assert grid_size >= 3, 'This is only designed for grids larger than 2x2'
         self.snake = Snake()
-        self.all_coords = {Coordinate(x, y) for x in range(grid_size) for y in range(grid_size)}
+        self.all_coords = {Vector(x, y) for x in range(grid_size) for y in range(grid_size)}
         self.grid_size = grid_size
         self.setCoin()
 
@@ -86,18 +89,17 @@ class Grid:
         return self.coin_location
     
     def setCoin(self):
-        snake_locations = set([self.snake.head] + list(self.snake.tail))
-        possible_setting = self.all_coords.difference(snake_locations)
+        possible_setting = self.all_coords.difference(self.snake.snake_locations)
         self.coin_location = choice(list(possible_setting))
 
     def _check_bounds(self, coord):
-        assert isinstance(coord, Coordinate), 'Cannot check bounds of object that is not of type Coordinate'
+        assert isinstance(coord, Vector), 'Cannot check bounds of object that is not of type Vector'
         return 0 <= coord.x < self.grid_size and 0 <= coord.y < self.grid_size
 
     def nn_image(self):
         ret = np.zeros((self.grid_size, self.grid_size, 3), 'uint8') + 100 # [0, 255] format
         ret[self.coin_location.y, self.coin_location.x, -1] = 255
-        for cell in [self.snake.head] + list(self.snake.tail):
+        for cell in self.snake.snake_locations:
             ret[cell.y, cell.x] = 255
         return ret
 
@@ -107,6 +109,7 @@ class Grid:
         if self.snake.head == self.coin_location:
             self.setCoin() # set a new coin
             self.snake.tail.appendleft(last)
+            self.snake.snake_locations.add(last)
             self.snake.snake_size += 1
 
     def check_state(self):
@@ -132,13 +135,4 @@ if __name__ == '__main__':
         elif state == 'WIN':
             print('You won!')
         break
-
-
-
-    # from PIL import Image
-    # image = Image.fromarray(grid.nn_image(snake), 'RGB')
-    # image = image.resize((640, 640)) # x16 from grid size, fix the quality
-    # image.save(fp='snake_rl/tmp_outputs/test.png', mode='PNG', quality=90)
-    # image.close() # needed?
-
     
