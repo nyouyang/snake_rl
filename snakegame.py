@@ -107,10 +107,10 @@ class Grid:
         self.snake.apply_direction(direction)
         last = self.snake.update()
         if self.snake.head == self.coin_location:
-            self.setCoin() # set a new coin
             self.snake.tail.appendleft(last)
             self.snake.snake_locations.add(last)
             self.snake.snake_size += 1
+            self.setCoin() # set a new coin
 
     def check_state(self):
         if not self._check_bounds(self.snake.head) or self.snake.head in self.snake.tail:
@@ -122,17 +122,18 @@ class Grid:
 
 if __name__ == '__main__':
     import cv2
-    grid = Grid(5)
+    grid = Grid(4)
     while True:
-        cv2.imwrite('snake_rl/tmp_outputs/test.png', cv2.resize(grid.nn_image(), (160, 160), interpolation=cv2.INTER_NEAREST))
-        move = input()
-        grid.apply_move(move)
         state = grid.check_state()
         if state == 'FINE':
+            cv2.imwrite('snake_rl/tmp_outputs/test.png', cv2.resize(grid.nn_image(), (160, 160), interpolation=cv2.INTER_NEAREST))
+            move = input()
+            grid.apply_move(move)
             continue
         elif state == 'LOSE':
             print('You lost.')
         elif state == 'WIN':
             print('You won!')
         break
+        
     
