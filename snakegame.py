@@ -83,10 +83,6 @@ class Grid:
         self.all_coords = {Vector(x, y) for x in range(grid_size) for y in range(grid_size)}
         self.grid_size = grid_size
         self.setCoin()
-
-    def getCoin(self):
-        assert self.coin_location is not None, 'No coins have been set yet'
-        return self.coin_location
     
     def setCoin(self):
         possible_setting = self.all_coords.difference(self.snake.snake_locations)
@@ -96,11 +92,12 @@ class Grid:
         assert isinstance(coord, Vector), 'Cannot check bounds of object that is not of type Vector'
         return 0 <= coord.x < self.grid_size and 0 <= coord.y < self.grid_size
 
-    def nn_image(self):
+    def nn_image(self): # outputs the image in a [0, 255] RGB tensor
         ret = np.zeros((self.grid_size, self.grid_size, 3), 'uint8') + 100 # [0, 255] format
         ret[self.coin_location.y, self.coin_location.x, -1] = 255
         for cell in self.snake.snake_locations:
             ret[cell.y, cell.x] = 255
+        # print(f'shape: {ret.shape}')
         return ret
 
     def apply_move(self, direction):
