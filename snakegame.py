@@ -1,24 +1,9 @@
 # Created by Nicholas Ouyang
 # July 2022
 
-'''
-Simple end goals for this file:
-    Write up basic logic for the game "Snake"
-        Snake main object
-            Head, tail, direction
-            Grid the game is played on
-        How the game updates
-            Control the snake
-            Add length to the snake
-            Win/lose conditions
-    Ensure the game can be output as an image
-        For later training of our deep CNN/RL model
-'''
-
 import numpy as np
 from collections import deque
 from random import choice
-
 
 class Vector:
     def __init__(self, x, y):
@@ -72,8 +57,8 @@ class Snake:
             last = self.tail.popleft()
         self.tail.append(self.head)
         self.head = new_head
-        self.snake_locations.add(new_head)
-        self.snake_locations.remove(last)
+        self.snake_locations.remove(last) # first move the tail
+        self.snake_locations.add(new_head) # then move the head
         return last
 
 class Grid:
@@ -82,6 +67,7 @@ class Grid:
         self.snake = Snake()
         self.all_coords = {Vector(x, y) for x in range(grid_size) for y in range(grid_size)}
         self.grid_size = grid_size
+        self.ate_this_turn = False
         self.setCoin()
     
     def setCoin(self):
@@ -97,40 +83,44 @@ class Grid:
         ret[self.coin_location.y, self.coin_location.x, -1] = 255
         for cell in self.snake.snake_locations:
             ret[cell.y, cell.x] = 255
-        # print(f'shape: {ret.shape}')
+        # print(f'shape: {ret.shape}') [255, 255, 3] shape
         return ret
 
     def apply_move(self, direction):
+        self.ate_this_turn = False
         self.snake.apply_direction(direction)
         last = self.snake.update()
         if self.snake.head == self.coin_location:
+            self.ate_this_turn = True
             self.snake.tail.appendleft(last)
             self.snake.snake_locations.add(last)
             self.snake.snake_size += 1
-            self.setCoin() # set a new coin
+            try:
+                self.setCoin() # set a new coin
+            except IndexError: # no more places to put coin, so you win
+                return True
 
     def check_state(self):
         if not self._check_bounds(self.snake.head) or self.snake.head in self.snake.tail:
             return 'LOSE'
-        elif self.snake.snake_size == self.grid_size ** 2:
-            return 'WIN'
         else:
             return 'FINE'
 
 if __name__ == '__main__':
     import cv2
-    grid = Grid(4)
+    grid = Grid(5)
     while True:
         state = grid.check_state()
         if state == 'FINE':
             cv2.imwrite('snake_rl/tmp_outputs/test.png', cv2.resize(grid.nn_image(), (160, 160), interpolation=cv2.INTER_NEAREST))
             move = input()
-            grid.apply_move(move)
+            if grid.apply_move(move):
+                print('You won!')
+                # print win state
+                cv2.imwrite('snake_rl/tmp_outputs/test.png', cv2.resize(grid.nn_image(), (160, 160), interpolation=cv2.INTER_NEAREST))
+                break
             continue
         elif state == 'LOSE':
             print('You lost.')
-        elif state == 'WIN':
-            print('You won!')
         break
         
-    
