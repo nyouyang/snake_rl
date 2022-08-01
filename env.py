@@ -1,4 +1,4 @@
-from snakegame import Grid
+from snakegame import Grid, Vector
 import numpy as np
 import torch
 
@@ -8,6 +8,17 @@ class Game:
         self.grid = Grid(grid_size)
         self.state = 'FINE'
     
+    def get_forbidden_direction(self):
+        current_direction = self.grid.snake.direction
+        if current_direction == Vector(1, 0):
+            return 'left'
+        elif current_direction == Vector(-1, 0):
+            return 'right'
+        elif current_direction == Vector(0, 1):
+            return 'up'
+        else:
+            return 'down'
+
     def image_with_permuted_channels(self):
         image = self.grid.nn_image()
         image_ = torch.from_numpy(image)

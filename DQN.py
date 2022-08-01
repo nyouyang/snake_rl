@@ -39,7 +39,7 @@ class DQNModel(nn.Module):
         self.fc1 = nn.Linear(linear_input_size, 128)
         self.fc2 = nn.Linear(128, num_actions) # num_actions is 4 here?
 
-        self.loss = nn.SmoothL1Loss()
+        self.loss = nn.MSELoss()
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.to(DEVICE)
 
@@ -48,35 +48,40 @@ class DQNModel(nn.Module):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
 
-        x = torch.flatten(x)
+        x = x.reshape(x.size(0), -1) # flatten with batch_size in mind
         x = self.fc1(x)
         x = self.fc2(x)
         return x
 
 class Agent:
     def __init__(self, w, h, lr, eps, discount, batch_size, num_actions, max_memory = 100000,
-                eps_min = 0.01, eps_dec = 1e-4):
+                eps_min = 0.01, eps_dec = 1e-5):
         self.lr = lr
         self.eps = eps
         self.eps_min = eps_min
         self.eps_dec = eps_dec
         self.discount = discount
         self.batch_size = batch_size
-        self.action_space = np.arange(num_actions)
+        self.action_space = {'right', 'left', 'up', 'down'}
         self.max_memory = max_memory
 
         self.QEvaluation = DQNModel(w=w, h=h, lr=lr, num_actions=num_actions)
         self.replayMemory = ReplayMemory(max_memory)
 
-    def choose_action(self, observation):
-        direction = ('right', 'left', 'up', 'down')
+    def choose_action(self, observation, forbidden_direction):
+        without_forbidden = ['right', 'left', 'up', 'down']
+        without_forbidden.remove(forbidden_direction)
         if np.random.random() > self.eps:
             state = observation.to(DEVICE)
             actions = self.QEvaluation.forward(state)
             chosen_action = torch.argmax(actions).item()
+            if ('right', 'left', 'up', 'down')[chosen_action] != forbidden_direction:
+                return ('right', 'left', 'up', 'down')[chosen_action]
+            else:
+                return np.random.choice(without_forbidden)
         else:
-            chosen_action = np.random.choice(self.action_space)
-        return direction[chosen_action]
+            return np.random.choice(without_forbidden)
+    
     
     def store_transition(self, state, action, reward, next_state):
         one_hot_action = torch.zeros(4)
@@ -91,17 +96,20 @@ class Agent:
         transitions = self.replayMemory.random_sample(self.batch_size)
         batch = Sars(*zip(*transitions)) # convert batch-array of Sars to Sars of batch-arrays
 
-        non_final_mask = torch.tensor(tuple(map(lambda x: x is not None, batch.next_state)), dtype=bool, device=DEVICE)
-        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
+        state_batch = torch.cat(batch.state) # 64x3x5x5
+        action_batch = torch.vstack(batch.action) # 64x4
+        reward_batch = torch.vstack(batch.reward) # 64x1
 
-        state_batch = torch.cat(batch.state)
-        action_batch = torch.cat(batch.action)
-        reward_batch = torch.cat(batch.reward)
+        action_batch_mask = action_batch > 0
+        q_eval = self.QEvaluation.forward(state_batch)[action_batch_mask.reshape(self.batch_size, -1)]
 
-        q_eval = self.QEvaluation.forward(state_batch).gather(1, action_batch)
+        # questionable part
+        non_final_mask = torch.tensor(tuple(map(lambda x: x is not None, batch.next_state)), dtype=bool, device=DEVICE) # 64x1
+        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]) # 32x3x3x5
+        next_state_values = torch.zeros(self.batch_size, device=DEVICE) # 64x1
+        next_state_values[non_final_mask] = torch.max(self.QEvaluation.forward(non_final_next_states), 1)[0]
+        # print(next_state_values)
 
-        next_state_values = torch.zeros(self.batch_size, device=DEVICE)
-        next_state_values[non_final_mask] = torch.max(self.QEvaluation(non_final_next_states), 1).detach()
         q_target = reward_batch + self.discount * next_state_values
 
         self.QEvaluation.optimizer.zero_grad()
@@ -122,7 +130,7 @@ if __name__ == '__main__':
         done = False
         observation = env.reset()
         while not done:
-            action = agent.choose_action(observation)
+            action = agent.choose_action(observation, forbidden_direction=env.get_forbidden_direction())
             observation_, reward, done = env.step(action)
             score += reward
             agent.store_transition(observation, action, torch.tensor([reward], device=DEVICE), observation_)
