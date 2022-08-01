@@ -1,3 +1,4 @@
+from fileinput import filename
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,6 +7,7 @@ import numpy as np
 from collections import namedtuple, deque
 import random
 from env import Game
+from utils import plot_learning_curve
 
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 Sars = namedtuple('Sars', ('state', 'action', 'reward', 'next_state'))
@@ -103,7 +105,7 @@ class Agent:
         action_batch_mask = action_batch > 0
         q_eval = self.QEvaluation.forward(state_batch)[action_batch_mask.reshape(self.batch_size, -1)]
 
-        # questionable part
+        # look at
         non_final_mask = torch.tensor(tuple(map(lambda x: x is not None, batch.next_state)), dtype=bool, device=DEVICE) # 64x1
         non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]) # 32x3x3x5
         next_state_values = torch.zeros(self.batch_size, device=DEVICE) # 64x1
@@ -141,4 +143,8 @@ if __name__ == '__main__':
         
         avg_score = np.mean(scores[-100:])
         print('episode: ', i, 'score: ', score, ' average score %.1f' % avg_score, 'epsilon %.2f' % agent.eps)
+
+    x = [i + 1 for i in range(num_games)]
+    file_name = 'snake_rl_1.png'
+    plot_learning_curve(x, scores, eps_history, file_name)
         
