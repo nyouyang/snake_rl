@@ -1,5 +1,9 @@
+#
+# snakegame.py
+#
 # Created by Nicholas Ouyang
 # July 2022
+#
 
 import numpy as np
 from collections import deque

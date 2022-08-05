@@ -1,3 +1,10 @@
+#
+# DQN.py
+#
+# Created by Nicholas Ouyang
+# July 2022
+#
+
 from fileinput import filename
 import torch
 import torch.nn as nn
@@ -56,8 +63,8 @@ class DQNModel(nn.Module):
         return x
 
 class Agent:
-    def __init__(self, w, h, lr, eps, discount, batch_size, num_actions, max_memory = 100000,
-                eps_min = 0.01, eps_dec = 1e-5):
+    def __init__(self, w, h, lr, eps, discount, batch_size, num_actions, max_memory = 10000,
+                eps_min = 0.01, eps_dec = 1e-6):
         self.lr = lr
         self.eps = eps
         self.eps_min = eps_min
@@ -106,10 +113,14 @@ class Agent:
         q_eval = self.QEvaluation.forward(state_batch)[action_batch_mask.reshape(self.batch_size, -1)]
 
         # look at
-        non_final_mask = torch.tensor(tuple(map(lambda x: x is not None, batch.next_state)), dtype=bool, device=DEVICE) # 64x1
-        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]) # 32x3x3x5
-        next_state_values = torch.zeros(self.batch_size, device=DEVICE) # 64x1
-        next_state_values[non_final_mask] = torch.max(self.QEvaluation.forward(non_final_next_states), 1)[0]
+        # non_final_mask = torch.tensor(tuple(map(lambda x: x is not None, batch.next_state)), dtype=bool, device=DEVICE) # 64x1
+        # non_final_next_states = torch.cat([s for s in batch.next_state if s is not None]) # 32x3x3x5
+        # next_state_values = torch.zeros(self.batch_size, device=DEVICE) # 64x1
+        # next_state_values[non_final_mask] = torch.max(self.QEvaluation.forward(non_final_next_states), 1)[0]
+
+        next_state_values = torch.tensor(tuple(map(
+            lambda x: torch.max(self.QEvaluation.forward(x), 1)[0] if x is not None else 0,
+            batch.next_state)), device=DEVICE)
         # print(next_state_values)
 
         q_target = reward_batch + self.discount * next_state_values
@@ -125,7 +136,7 @@ if __name__ == '__main__':
     env = Game(5)
     agent = Agent(w=env.grid_size, h=env.grid_size, lr=0.001, eps=0.99, discount=0.99, batch_size=64, num_actions=4)
     scores, eps_history = [], []
-    num_games = 1000000
+    num_games = 200000
 
     for i in range(num_games):
         score = 0

@@ -1,3 +1,10 @@
+#
+# env.py
+#
+# Created by Nicholas Ouyang
+# July 2022
+#
+
 from snakegame import Grid, Vector
 import numpy as np
 import torch
@@ -40,9 +47,9 @@ class Game:
         image = self.image_with_permuted_channels()
 
         if self.grid.ate_this_turn:
-            return image / 255, 1, False
+            return image, 1, False
         else:
-            return image / 255, -0.001, False
+            return image, -0.001, False
         
 
 if __name__ == '__main__':
